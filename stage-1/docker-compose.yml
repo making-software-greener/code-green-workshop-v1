@@ -1,0 +1,121 @@
+version:	'2'
+services:
+  backend-fastapi:
+    build:
+      context: ./backend-fastapi
+    container_name: shakespeare-searcher-backend-fastapi
+    depends_on:
+      database-mysql:
+        condition: service_started
+      database-redis:
+        condition: service_started
+    networks:
+      backend-database: null
+      frontend-backend: null
+    ports:
+    - mode: ingress
+      target: 80
+      published: "82"
+      protocol: tcp
+    restart: always
+  database-mysql:
+    container_name: shakespeare-searcher-db-mysql
+    env_file:
+    - environment.env
+    image: mysql:8.0
+    networks:
+      backend-database: null
+      mysql-phpmyadmin: null
+    ports:
+    - mode: ingress
+      target: 3306
+      published: "3306"
+      protocol: tcp
+    restart: always
+    volumes:
+    - type: bind
+      source: ./volumes/mysql-data
+      target: /var/lib/mysql
+    - type: bind
+      source: ./volumes/mysql-logs
+      target: /var/log/mysql
+  database-redis:
+    command:
+    - redis-server
+    - --requirepass
+    - ${REDIS_PASSWORD}
+    container_name: shakespeare-searcher-db-redis
+    env_file:
+    - environment.env
+    image: redis:7.0-alpine
+    networks:
+      backend-database: null
+      redis-redis-insight: null
+    ports:
+    - mode: ingress
+      target: 6379
+      published: "6379"
+      protocol: tcp
+    restart: always
+    volumes:
+    - type: bind
+      source: ./volumes/redis-data
+      target: /data
+  db-admin-phpmyadmin:
+    container_name: shakespeare-searcher-dbadmin-phpmyadmin
+    depends_on:
+      database-mysql:
+        condition: service_started
+      database-redis:
+        condition: service_started
+    env_file:
+    - environment.env
+    image: phpmyadmin/phpmyadmin:latest
+    networks:
+      mysql-phpmyadmin: null
+    ports:
+    - mode: ingress
+      target: 80
+      published: "83"
+      protocol: tcp
+    volumes:
+    - type: bind
+      source: ./volumes/phpmyadmin-sessions
+      target: /sessions
+  db-admin-redis-insight:
+    container_name: shakespeare-searcher-dbadmin-redis-insight
+    depends_on:
+      database-mysql:
+        condition: service_started
+      database-redis:
+        condition: service_started
+    image: redislabs/redisinsight:latest
+    networks:
+      redis-redis-insight: null
+    ports:
+    - mode: ingress
+      target: 8001
+      published: "84"
+      protocol: tcp
+  frontend-common-website:
+    build:
+      context: ./frontend-website
+    container_name: shakespeare-searcher-frontend-nginx
+    depends_on:
+      backend-fastapi:
+        condition: service_started
+      database-mysql:
+        condition: service_started
+      database-redis:
+        condition: service_started
+    ports:
+    - mode: ingress
+      target: 80
+      published: "81"
+      protocol: tcp
+    restart: always
+networks:
+  backend-database: {}
+  frontend-backend: {}
+  mysql-phpmyadmin: {}
+  redis-redis-insight: {}
