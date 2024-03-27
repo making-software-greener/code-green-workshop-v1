@@ -14,6 +14,24 @@ services:
     volumes:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.toml:/traefik.toml
+  jaeger:
+    image: jaegertracing/all-in-one:1.17
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14268:14268"
+      - "9411:9411"
+    labels:
+      traefik.http.routers.jaeger.rule: Host(`jaeger.docker.localhost`)
+      traefik.http.routers.jaeger.entrypoints: web
+      traefik.http.routers.jaeger.service: jaeger
+      traefik.http.services.jaeger.loadbalancer.server.port: 16686
   whoami:
     # A container that exposes an API to show its IP address
     image: traefik/whoami

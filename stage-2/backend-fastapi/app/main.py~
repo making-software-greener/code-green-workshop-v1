@@ -1,0 +1,81 @@
+''' Shakespeare API '''
+'''
+TODO:
+1. make plays & players case insensitive for the search
+'''
+import re
+from collections import Counter
+
+from typing import Optional
+
+from fastapi import FastAPI
+from tinydb import TinyDB, Query
+
+
+db = TinyDB('/app/shakespearedb.json')
+Plays = Query()
+
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@app.get("/plays")
+def get_play_names():
+    plays = [play.get('Play') for play in db.search(Plays.Play.exists())]
+    plays = list(set(plays))
+    plays.sort()
+    print(plays)
+    return {"plays": plays}
+
+@app.get("/plays/{play_name}/players")
+def get_play_players(play_name: str):
+    players = [player.get("Player") for player in db.search((Plays.Player.exists()) & (Plays.Play == play_name))]
+    players = list(set(players))
+    players.sort()
+    return {"players": players}
+
+def raw_words(query_results):
+    words = [re.sub('[\W_]', ' ', line.get("PlayerLine")).lower().split() for line in query_results]
+    words_flattened = [item for sub_list in words for item in sub_list]
+    return words_flattened
+
+@app.get("/words")
+def get_words():
+    words = raw_words(db.search(Plays.PlayerLine.exists()))
+    return {"words": Counter(words).keys().sort()}
+
+@app.get("/words/counts")
+def get_words_counts():
+    words = raw_words(db.search(Plays.PlayerLine.exists()))
+    counter = Counter(words)
+    return {"word_counts": list(zip(counter.keys(), counter.values())).sort(key = lambda x: x[0])}
+
+@app.get("/words/play/{play_name}")
+def get_play_words(play_name: str):
+    words = raw_words(db.search((Plays.PlayerLine.exists()) & (Plays.Play == play_name)))
+    return {"words": Counter(words).keys()}
+
+@app.get("/words/play/{play_name}/count")
+def get_play_words_count(play_name: str):
+    words = raw_words(db.search((Plays.PlayerLine.exists()) & (Plays.Play == play_name)))
+    counter = Counter(words)
+    return {"play_word_counts": list(zip(counter.keys(), counter.values())).sort(key = lambda x: x[0])}
+
+@app.get("/words/player/{player_name}")
+def get_player_words(player_name: str):
+    words = raw_words(db.search((Plays.PlayerLine.exists()) & (Plays.Player == player_name)))
+    return {"words": Counter(words).keys().sort()}
+
+@app.get("/words/player/{player_name}/count")
+def get_player_words_count(player_name: str):
+    words = raw_words(db.search((Plays.PlayerLine.exists()) & (Plays.Player == player_name)))
+    counter = Counter(words)
+    return {"player_word_counts": list(zip(counter.keys(), counter.values())).sort(key = lambda x: x[0])}
+
+
+ 
